@@ -1,0 +1,305 @@
+#!/usr/bin/python3
+#
+# Author: Fabian Herschel - 2023
+# (c) 2023-2024 Fabian Herschel
+#
+import numpy as np
+import argparse
+
+s_file = "sudoku.txt"
+steps = False
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--sudoku", help="sudoku file")
+parser.add_argument("--steps", help="show steps", action="store_true")
+args = parser.parse_args()
+if args.sudoku:
+    s_file = args.sudoku
+if args.steps:
+    steps = True
+    
+
+g_method1 = 0  # counter for method 1  - only one digit does fits in a cell
+g_method2a = 0 # counter for method 2a - checkUniquePositionInRow
+g_method2b = 0 # counter for method 2b - checkUniquePositionInCol
+g_method3 = 0 # counter for method 3
+
+digits = [ '1', '2', '3', '4', '5', '6', '7', '8', '9' ]
+
+def getCellNumber(row, col):
+    """
+    getCellNumber()
+    calculates "serial" cell number (beginning from 0)
+    params:
+        col: column number from 1..9
+        row: row number from 1..9
+    """
+    # print(f"row={row}, col={col} res={(row - 1) * 9 + col}")
+    return (row - 1) * 9 + col - 1
+
+def getRow(cells, row):
+    """
+    getRow()
+    return an "array" of all members of a given row (left-right)
+    params:
+        cells: array of all cells in sequential order
+        row: row number (1..9) to be extracted
+    """
+    result = []
+    for col in range (1, 10):
+        result.append(cells[getCellNumber(row, col)])
+    return result
+
+def getCol(cells, col):
+    """
+    getCol()
+    return an "array" of all members of a given column (top-down)
+    params:
+        cells: array of all cells in sequential order
+        col: col number (1..9) to be extracted
+    """
+    result = []
+    for row in range (1, 10):
+        result.append(cells[getCellNumber(row, col)])
+    return result
+
+def getField(cells, field):
+    """
+    getField()
+    return an "array" of all members of a given 3x3 field (left-right, top-down)
+    params:
+        cells: array of all cells in sequential order
+        field: field number (1..9) to be extracted - field number is counting left-right, top-down
+    """
+    result = []
+    field -= 1
+    f_row = int(field / 3) * 3 + 1
+    f_col = ( field % 3 ) * 3 + 1 
+    for row in range (f_row, f_row + 3 ):
+        for col in range (f_col, f_col + 3 ):
+            result.append(cells[getCellNumber(row, col)])
+    return result
+
+def getFieldNoByRowCol(row, col):
+    """
+    getFieldNoByRowCol()
+    params:
+        row: row number (1-9)
+        col: col number (1-9)
+    """
+    result = 0
+    fc = int( ( col - 1 ) / 3) + 1
+    fr = int( ( row - 1 ) / 3) + 1
+    result = ( fr - 1 ) * 3 + fc
+    # print(f"fc={fc} fr={fr} res={result}")
+    return result
+
+def elemNumberToRowCol(elem_no):
+    """
+    elemNumberToRowCol(elem_no)
+    translate the elemement number counted from left to right and top to down
+    into a row-number and a colum-number
+    """
+    row = int (elem_no / 9) + 1
+    col = int (elem_no % 9) + 1
+    return (row, col)
+
+def getFreeNumbers(cells, row, col):
+    """
+    getFreeNumbers(cells, row, col)
+    get possible numbers to be placed at position row, col
+    params:
+        cells: array of all cells in sequential order
+        row: row number (1-9)
+        col: col number (1-9)
+    """
+    result = digits.copy()
+    numCol = getCol(cells, col)
+    numRow = getRow(cells, row)
+    numField = getField(cells, getFieldNoByRowCol(row, col))
+    # print(f"numCol={numCol}")
+    # print(f"numRow={numRow}")
+    # print(f"numField={numField}")
+    for elem in numCol:
+        if elem in result:
+            result.remove(elem)
+    for elem in numRow:
+        if elem in result:
+            result.remove(elem)
+    for elem in numField:
+        if elem in result:
+            result.remove(elem)
+    return result
+
+def checkUniquePositionInRow(cells, row):
+    """
+    check for a specific cell in a row, if any digit could only be placed in that cell
+    this means all other cells in the row could NOT take the digit
+    params:
+        cells: array of all cells in sequential order
+        row: row number (1-9)
+    """
+    solved = 0
+    check_for = digits.copy()
+    for digit in check_for:
+        can_have_digit = []
+        for col in range(1, 10):
+            if cells[getCellNumber(row, col)] == '-':
+                free_numbers = getFreeNumbers(cells, row, col)
+                if digit in free_numbers:
+                    can_have_digit.append(col)
+        if len(can_have_digit) == 1:
+            cells[getCellNumber(row, can_have_digit[0])] = digit
+            solved += 1
+            if steps:
+                print(f"FF checkUniquePositionInRow - row={row} col={can_have_digit[0]} digit={digit} is unique")
+        if len(can_have_digit) > 1:
+            pass
+    return solved
+
+def checkUniquePositionInCol(cells, col):
+    """
+    check for a specific cell in a column, if any digit could only be placed in that cell
+    this means all other cells in the row could NOT take the digit
+    params:
+        cells: array of all cells in sequential order
+        col: col number (1-9)
+    """
+    solved = 0
+    check_for = digits.copy()
+    for digit in check_for:
+        can_have_digit = []
+        for row in range(1, 10):
+            if cells[getCellNumber(row, col)] == '-':
+                free_numbers = getFreeNumbers(cells, row, col)
+                if digit in free_numbers:
+                    can_have_digit.append(row)
+        if len(can_have_digit) == 1:
+            cells[getCellNumber(can_have_digit[0], col)] = digit
+            solved += 1
+            if steps:
+                print(f"FF checkUniquePositionInCol - row={can_have_digit[0]} col={col} digit={digit} is unique")
+        if len(can_have_digit) > 1:
+            pass
+    return solved
+
+def checkUniquePositionInField(cells, row, col):
+    """
+    checkUniquePositionInField()
+    params:
+        cells
+        row
+        col
+    """
+    solved = 0
+    check_for = digits.copy()
+    field_no = getFieldNoByRowCol(row, col)
+    the_field = getField(cells, field_no)
+    for digit in check_for:
+        can_have_digit = []
+        for i in range(1,10):
+            if cells[getCellNumber(row, col)] == '-':
+                free_numbers = getFreeNumbers(cells, row, col)
+                if digit in free_numbers:
+                    can_have_digit.append(row)
+        if len(can_have_digit) == 1:
+            cells[getCellNumber(can_have_digit[0], col)] = digit
+            solved += 1
+            if steps:
+                print(f"FF checkUniquePositionInField - row={can_have_digit[0]} col={col} row={row} digit={digit} is unique")
+        if len(can_have_digit) > 1:
+            pass
+
+    return solved
+
+def printGame(cells):
+    """
+    printGame()
+    print the complete game (left-right, top-down)
+    params:
+        cells: array of all cells in sequential order
+    """
+    elemNumber = 0
+    for row in range(1, 10):
+        for col in range(1, 10):
+            print(cells[elemNumber],end='')
+            elemNumber += 1
+            if col % 3 == 0:
+                print(' ',end='')
+        print('')
+        if row % 3 == 0:
+            print('')
+
+cell_count = 0
+cells = []
+with open(s_file, "r", encoding="UTF-8") as fobj:
+    for line in fobj:
+        line = line.rstrip()
+        # print(line)
+        if line != '':
+            for c in line[0:]:
+                if c != ' ':
+                    cell_count += 1
+                    # print(f"cc {cell_count}: {c}")
+                    cells.append(c)
+
+print("Aufgabe:")
+printGame(cells)
+
+while True:
+    open_cells_old = cells.count('-')
+    method1 = 0
+    method2a = 0
+    method2b = 0
+    method3 = 0
+    # print(f"open cells: {open_cells_old}")
+    elemNumber = 0
+    for elem in cells:
+        if cells[elemNumber] == '-':
+            (row, col) = elemNumberToRowCol(elemNumber)
+            #
+            # method 1: check, if only one digit does fit in the cell
+            #
+            free_numbers = getFreeNumbers(cells, row, col)
+            if len(free_numbers) == 1:
+                cells[elemNumber] = free_numbers[0]
+                method1 += 1
+                #print(f"method 1: row={row},col={col}: {free_numbers[0]}")
+        elemNumber += 1
+    #
+    # method 2: check, if only one cell could take a specific digit in a row, ...
+    #
+    #printGame(cells)
+    elemNumber = 0
+    for elem in cells:
+        if cells[elemNumber] == '-':
+            (row, col) = elemNumberToRowCol(elemNumber)
+            # method 2a: check for row
+            method2a += checkUniquePositionInRow(cells, row)
+            method2b += checkUniquePositionInCol(cells, col)
+            method3 += checkUniquePositionInField(cells, row, col)
+            #
+            #
+            # 
+            # print(f"row={row},col={col}: {getFreeNumbers(cells, row, col)}")
+        elemNumber += 1
+    open_cells_new = cells.count('-')
+    solved_cells = open_cells_old - open_cells_new
+    g_method1 += method1
+    g_method2a += method2a
+    g_method2b += method2b
+    g_method3 += method3
+    if True or steps:
+        print(f"FF open cells: {open_cells_new}; solved: {solved_cells} m1={method1} m2a={method2a} m2b={method2b}")
+    #printGame(cells)
+    if solved_cells == 0:
+        break
+
+if open_cells_new == 0:
+    print(f"FF used methods: only one digit fits: {g_method1} checkUniquePositionInRow={g_method2a} checkUniquePositionInCol={g_method2b}")
+    print("Lösung:")
+    printGame(cells)
+else:
+    print(f"FF open cells: {open_cells_new}; solved: {solved_cells} m1={g_method1} m2a={g_method2a} m2b={g_method2b}")
+    print("Restaufgabe:")
+    printGame(cells)
