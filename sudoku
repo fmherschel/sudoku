@@ -8,6 +8,7 @@ import argparse
 
 s_file = "sudoku.txt"
 steps = False
+dbg = False
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--sudoku", help="sudoku file")
@@ -80,6 +81,20 @@ def getField(cells, field):
             result.append(cells[getCellNumber(row, col)])
     return result
 
+def getFieldPosList(cells, field):
+    """
+    getFieldPosList(cells, field)
+    get the list of positions (row, col) of a given field
+    """
+    result = []
+    field -= 1
+    f_row = int(field / 3) * 3 + 1
+    f_col = ( field % 3 ) * 3 + 1 
+    for row in range (f_row, f_row + 3 ):
+        for col in range (f_col, f_col + 3 ):
+            result.append([row, col])
+    return result
+
 def getFieldNoByRowCol(row, col):
     """
     getFieldNoByRowCol()
@@ -131,6 +146,21 @@ def getFreeNumbers(cells, row, col):
             result.remove(elem)
     return result
 
+def checkFreeNumber(cells, row, col, number):
+    """
+    checkFreeNumber(cells, row, col, number)
+    checks if number could be placed on row, col
+    """
+    result = False
+    nums = getCol(cells, col)
+    nums.extend(getRow(cells, row))
+    nums.extend(getField(cells, getFieldNoByRowCol(row, col)))
+    if dbg:
+        print(f"dbg: checkFreeNumber row={row} col={col} number={number} nums={nums}")
+    if not number in nums:
+        result = True
+    return result
+
 def checkUniquePositionInRow(cells, row):
     """
     check for a specific cell in a row, if any digit could only be placed in that cell
@@ -142,19 +172,18 @@ def checkUniquePositionInRow(cells, row):
     solved = 0
     check_for = digits.copy()
     for digit in check_for:
-        can_have_digit = []
+        col_can_have_digit = []
         for col in range(1, 10):
             if cells[getCellNumber(row, col)] == '-':
                 free_numbers = getFreeNumbers(cells, row, col)
                 if digit in free_numbers:
-                    can_have_digit.append(col)
-        if len(can_have_digit) == 1:
-            cells[getCellNumber(row, can_have_digit[0])] = digit
+                    col_can_have_digit.append(col)
+        if len(col_can_have_digit) == 1:
+            cells[getCellNumber(row, col_can_have_digit[0])] = digit
             solved += 1
             if steps:
-                print(f"FF checkUniquePositionInRow - row={row} col={can_have_digit[0]} digit={digit} is unique")
-        if len(can_have_digit) > 1:
-            pass
+                print(f"INSERT R [{row}, {col_can_have_digit[0]}] = {digit}")
+                #print(f"FF checkUniquePositionInRow - row={row} col={col_can_have_digit[0]} digit={digit} is unique")
     return solved
 
 def checkUniquePositionInCol(cells, col):
@@ -168,47 +197,59 @@ def checkUniquePositionInCol(cells, col):
     solved = 0
     check_for = digits.copy()
     for digit in check_for:
-        can_have_digit = []
+        row_can_have_digit = []
         for row in range(1, 10):
             if cells[getCellNumber(row, col)] == '-':
                 free_numbers = getFreeNumbers(cells, row, col)
                 if digit in free_numbers:
-                    can_have_digit.append(row)
-        if len(can_have_digit) == 1:
-            cells[getCellNumber(can_have_digit[0], col)] = digit
+                    row_can_have_digit.append(row)
+        if len(row_can_have_digit) == 1:
+            cells[getCellNumber(row_can_have_digit[0], col)] = digit
             solved += 1
             if steps:
-                print(f"FF checkUniquePositionInCol - row={can_have_digit[0]} col={col} digit={digit} is unique")
-        if len(can_have_digit) > 1:
-            pass
+                print(f"INSERT C [{row_can_have_digit[0]}, {col}] = {digit}")
+                # print(f"FF checkUniquePositionInCol - row={row_can_have_digit[0]} col={col} digit={digit} is unique")
     return solved
 
 def checkUniquePositionInField(cells, row, col):
     """
     checkUniquePositionInField()
-    params:
-        cells
-        row
-        col
+    params: cells row col
+    check for a given cell (row, col), if there is a digit, which can only be placed in the given cell
     """
     solved = 0
     check_for = digits.copy()
     field_no = getFieldNoByRowCol(row, col)
     the_field = getField(cells, field_no)
-    for digit in check_for:
-        can_have_digit = []
-        for i in range(1,10):
-            if cells[getCellNumber(row, col)] == '-':
-                free_numbers = getFreeNumbers(cells, row, col)
-                if digit in free_numbers:
-                    can_have_digit.append(row)
-        if len(can_have_digit) == 1:
-            cells[getCellNumber(can_have_digit[0], col)] = digit
-            solved += 1
-            if steps:
-                print(f"FF checkUniquePositionInField - row={can_have_digit[0]} col={col} row={row} digit={digit} is unique")
-        if len(can_have_digit) > 1:
-            pass
+    the_field_pos = getFieldPosList(cells, field_no)
+    if dbg:
+        print(f"dbg: cUPiF: row={row} col={col} the_field={the_field}")
+    if cells[getCellNumber(row, col)] == '-':
+        for digit in check_for:
+            cells_can_have_digit = []
+            # for all members (cells) of the field, check if the digit could be placed in that cell
+            for i in range(0,9):
+                check_cell = the_field_pos[i]
+                [ check_row, check_col ] = check_cell
+                if cells[getCellNumber(check_row, check_col)] == '-':
+                    if checkFreeNumber(cells, check_row, check_col, digit):
+                        if dbg:
+                            print(f"dbg: cUPiF: checkFreeNumber row={check_row} col={check_col} digit={digit}")
+                        cells_can_have_digit.append(check_cell)
+            if len(cells_can_have_digit) == 1:
+                u_cell = cells_can_have_digit[0]
+                ( u_row, u_col ) = u_cell
+                if dbg:
+                    print(f"dbg: cUPiF: ONLY ONE POS u_row={u_row} u_col={u_col} digit={digit} cells_can_have_digit={cells_can_have_digit}")
+                cells[getCellNumber(u_row, u_col)] = digit
+                solved += 1
+                if steps:
+                    print(f"INSERT F [{u_row}, {u_col}] = {digit}")
+                    # print(f"FF checkUniquePositionInField - row={row} col={col} digit={digit} is unique")
+                break
+            else:
+                if dbg:
+                    print(f"dbg: checkUniquePositionInField - row={row} col={col} digit={digit} can be placed at {cells_can_have_digit}")
 
     return solved
 
@@ -296,10 +337,10 @@ while True:
         break
 
 if open_cells_new == 0:
-    print(f"FF used methods: only one digit fits: {g_method1} checkUniquePositionInRow={g_method2a} checkUniquePositionInCol={g_method2b}")
+    print(f"FF used methods: only one digit fits: {g_method1} checkUniquePositionInRow={g_method2a} checkUniquePositionInCol={g_method2b} checkUniquePositionInField={g_method3}")
     print("Lösung:")
     printGame(cells)
 else:
-    print(f"FF open cells: {open_cells_new}; solved: {solved_cells} m1={g_method1} m2a={g_method2a} m2b={g_method2b}")
+    print(f"FF open cells: {open_cells_new}; solved: {solved_cells} m1={g_method1} m2a={g_method2a} m2b={g_method2b} m3={g_method3}")
     print("Restaufgabe:")
     printGame(cells)
